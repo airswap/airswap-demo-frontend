@@ -62,7 +62,11 @@ function App() {
 
   let cost = '?'
   if (connected && pricing && amount) {
-    cost = String(getCostFromPricing('buy', amount, baseToken, quoteToken, pricing))
+    try {
+      cost = String(getCostFromPricing('buy', amount, baseToken, quoteToken, pricing))
+    } catch (e) {
+      cost = 'too high'
+    }
   }
 
   return (
