@@ -6,21 +6,36 @@ export const MetaMaskContext = React.createContext({})
 
 export const MetaMaskProvider: FC = ({ children }) => {
 
-    const { chainId, activate, account, library, connector, active, deactivate } = useWeb3React()
-
+    const { chainId, activate, account, library, active, deactivate } = useWeb3React()
     const [isActive, setIsActive] = useState(false)
-    const [shouldDisable, setShouldDisable] = useState(false) // Should disable connect button while connecting to MetaMask
+    const [shouldDisable, setShouldDisable] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
+
+    const connect = useCallback(async () => {
+        setShouldDisable(true)
+        try {
+            await activate(injected).then(() => {
+                setShouldDisable(false)
+            })
+        } catch(error) {
+            console.log('Error on connecting: ', error)
+        }
+    }, [activate])
+
+    const disconnect = useCallback(async () => {
+        try {
+            await deactivate()
+        } catch(error) {
+            console.log('Error on disconnnect: ', error)
+        }
+    }, [deactivate])
 
     // Init Loading
     useEffect(() => {
         connect().then(val => {
-
-    console.log(account, library)
-
             setIsLoading(false)
         })
-    }, [])
+    }, [account, connect, library])
 
     // Check when App is Connected or Disconnected to MetaMask
     const handleIsActive = useCallback(() => {
@@ -32,29 +47,6 @@ export const MetaMaskProvider: FC = ({ children }) => {
         handleIsActive()
     }, [handleIsActive])
 
-    // Connect to MetaMask wallet
-    const connect = async () => {
-        console.log('Connecting to MetaMask...')
-        setShouldDisable(true)
-        try {
-            await activate(injected).then(() => {
-                setShouldDisable(false)
-            })
-        } catch(error) {
-            console.log('Error on connecting: ', error)
-        }
-    }
-
-    // Disconnect from Metamask wallet
-    const disconnect = async () => {
-        console.log('Disconnecting wallet from App...')
-        try {
-            await deactivate()
-        } catch(error) {
-            console.log('Error on disconnnect: ', error)
-        }
-    }
-
     const values = useMemo(
         () => ({
             isActive,
@@ -65,7 +57,7 @@ export const MetaMaskProvider: FC = ({ children }) => {
             shouldDisable,
             chainId,
         }),
-        [isActive, isLoading, shouldDisable, account]
+        [connect, disconnect, isActive, isLoading, shouldDisable, account, chainId]
     )
 
     return <MetaMaskContext.Provider value={values}>{children}</MetaMaskContext.Provider>

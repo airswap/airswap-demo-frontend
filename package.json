@@ -5,8 +5,9 @@
   "dependencies": {
     "@airswap/constants": "^3.0.0-beta.3",
     "@airswap/libraries": "^3.0.0-beta.6",
-    "@airswap/metadata": "^3.0.0-beta.1",
+    "@airswap/metadata": "^3.0.0-beta.2",
     "@airswap/typescript": "^3.0.0-beta.1",
+    "@airswap/utils": "^3.0.0-beta.1",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
     "@testing-library/user-event": "^12.1.10",

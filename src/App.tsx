@@ -3,11 +3,19 @@ import './App.css'
 import { Button } from 'react-bootstrap'
 import useMetaMask from './hooks/metamask';
 
+import { chainNames } from "@airswap/constants"
 import { Server } from "@airswap/libraries";
-import { findTokensBySymbol } from "@airswap/metadata";
-import { Order, Pricing, TokenInfo } from "@airswap/typescript";
+import { getCostFromPricing } from "@airswap/utils"
+import { fetchTokens, findTokensBySymbol } from "@airswap/metadata";
+import { Pricing } from "@airswap/typescript";
 
-const LOCATOR = 'ws://localhost:3000'
+const swapDeploys = require('@airswap/swap/deploys.js')
+
+const SERVER_URL = 'ws://localhost:3000'
+let connecting = false
+let connected = false
+let baseToken = ''
+let quoteToken = ''
 
 type Pair = {
   baseToken: string;
@@ -16,51 +24,64 @@ type Pair = {
 
 function App() {
 
-  const { chainId, connect, disconnect, isActive, account, shouldDisable } = useMetaMask()
-  const [pricing, updatePricing] = useState<Pricing[]>([]);
+  const { chainId, connect, isActive, account, shouldDisable } = useMetaMask()
+  const [amount, updateAmount] = useState<string>('1');
+  const [pricing, updatePricing] = useState<Pricing[]>();
+  const [lastUpdate, updateLastUpdate] = useState<string>()
 
-  console.log(chainId)
-
-  /*
-  const baseToken: TokenInfo = findTokensBySymbol('WETH', chainId)[0];
-  const quoteToken: TokenInfo = findTokensBySymbol('USDT', chainId)[0];
-  */
-
-
-
-  const pair: Pair = { baseToken: 'baseToken.address', quoteToken: 'quoteToken.address'}
-
-  const server: Server = new Server('ws://localhost:3000')
   const handlePricing = (pricing: Pricing[]) => {
-    updatePricing(
-      pricing,
-    )
+    updateLastUpdate(new Date().toLocaleTimeString())
+    updatePricing(pricing)
   };
 
-  server.on("pricing", handlePricing.bind(null));
-  server.on("error", (e) => {
-    console.error(
-      `RPC WebSocket error: [${server.locator}]: ${e.code} - ${e.message}`,
-      e
-    );
-  });
+  if (chainId && !connecting && !connected) {
+    connecting = true
 
-  const initialPricing = server.subscribe([pair]).then(initialPricing => {
-    handlePricing(initialPricing);
-  });
+    fetchTokens(chainId).then(({ tokens }) => {
+      baseToken = findTokensBySymbol('WAVAX', tokens)[0].address;
+      quoteToken = findTokensBySymbol('AST', tokens)[0].address;
+      const pair: Pair = { baseToken, quoteToken }
+
+      Server.at(SERVER_URL, {
+        swapContract: swapDeploys[chainId]
+      }).then(server => {
+        connecting = false
+        connected = true
+        server.on("pricing", handlePricing.bind(null));
+        server.on("error", (e) => {
+          console.error(
+            `RPC WebSocket error: [${server.locator}]: ${e.code} - ${e.message}`,
+            e
+          );
+        });
+        server.subscribe([pair]).then(handlePricing);
+      });
+
+    })
+  }
+
+  let cost = '?'
+  if (connected && pricing && amount) {
+    cost = String(getCostFromPricing('buy', amount, baseToken, quoteToken, pricing))
+  }
 
   return (
     <div className="App">
       <header className="App-header">
-        <Button variant="secondary" onClick={connect} disabled={shouldDisable}>
-          <img src="images/metamask.svg" alt="MetaMask" width="50" height="50" /> Connect to MetaMask
-        </Button>
         <div className="mt-2 mb-2">
-          Connected Account: { isActive ? account : '' }
+          <Button variant="secondary" onClick={connect} disabled={shouldDisable}>
+            Connect to MetaMask
+          </Button>
         </div>
-        <Button variant="danger" onClick={disconnect}>
-          Disconnect MetaMask<img src="images/noun_waving_3666509.svg" width="50" height="50" />
-        </Button>
+        <div className="mt-2 mb-2">
+          Buy: <input value={amount} onChange={e => updateAmount(e.target.value)} /> WAVAX
+        </div>
+        <div className="mt-2 mb-2">
+          [ Cost: { cost }, Updated: { lastUpdate } ]
+        </div>
+        <div className="mt-2 mb-2">
+          [ Account: { isActive ? account : '' }, Chain: { chainNames[chainId] } ]
+        </div>
       </header>
     </div>
   );
